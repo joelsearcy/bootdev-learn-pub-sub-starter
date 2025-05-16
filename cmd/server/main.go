@@ -30,13 +30,20 @@ func main() {
 	defer ch.Close()
 	fmt.Println("Successfully opened a channel...")
 
-	logCh, logQueue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueTypeDurable)
+	// logCh, logQueue, err := pubsub.DeclareAndBind(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueTypeDurable)
+	// if err != nil {
+	// 	fmt.Println("Failed to declare and bind game logs queue:", err)
+	// 	return
+	// }
+	// defer logCh.Close()
+	// fmt.Printf("Successfully created game logs queue: %s...\n", logQueue.Name)
+
+	err = pubsub.SubscribeGOB(conn, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.SimpleQueueTypeDurable, handlerGameLogs())
 	if err != nil {
-		fmt.Println("Failed to declare and bind game logs queue:", err)
+		fmt.Println("Failed to subscribe to game logs queue:", err)
 		return
 	}
-	defer logCh.Close()
-	fmt.Printf("Successfully created game logs queue: %s...\n", logQueue.Name)
+	fmt.Println("Successfully subscribed to game logs queue...")
 
 	gamelogic.PrintServerHelp()
 
@@ -76,4 +83,16 @@ func main() {
 	// signal.Notify(signalChan, os.Interrupt)
 	// <-signalChan
 	// fmt.Println("Shutting down...")
+}
+
+func handlerGameLogs() func(routing.GameLog) pubsub.AckType {
+	return func(gl routing.GameLog) pubsub.AckType {
+		defer fmt.Print("> ")
+		err := gamelogic.WriteLog(gl)
+		if err != nil {
+			fmt.Println("Failed to write game log:", err)
+			return pubsub.NackRequeue
+		}
+		return pubsub.Ack
+	}
 }
