@@ -9,9 +9,9 @@ import (
 type AckType int
 
 const (
-	Ack AckType = iota + 1
-	NackRequeue
+	Ack AckType = iota
 	NackDiscard
+	NackRequeue
 )
 
 func subscribe[T any](
@@ -26,6 +26,11 @@ func subscribe[T any](
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, simpleQueueType)
 	if err != nil {
 		return fmt.Errorf("failed to declare and bind queue: %w", err)
+	}
+
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("failed to set QoS: %w", err)
 	}
 
 	deliveryCh, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
